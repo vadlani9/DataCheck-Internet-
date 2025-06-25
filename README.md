@@ -1,4 +1,4 @@
-# DataCheck-Internet-
+# DataCheck (Internet check)
 Check data is getting or not in iOS using Swift
 
 // Access the function
