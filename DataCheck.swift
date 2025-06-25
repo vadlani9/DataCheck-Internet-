@@ -21,10 +21,10 @@ final class DataCheck {
     private init() {
         startMonitoring()
     }
-
+    
     private func startMonitoring() {
         guard !isMonitoring else { return }
-
+        
         monitor.pathUpdateHandler = { [weak self] path in
             self?.isNetworkPathSatisfied = path.status == .satisfied
         }
@@ -33,43 +33,65 @@ final class DataCheck {
         isMonitoring = true
     }
 
-    /// Returns true if device has actual internet access (not just Wi-Fi connected)
-    func hasRealInternet(completion: @escaping (Bool) -> Void) {
+    /// true if device has internet access
+    func internetDataCheck(completion: @escaping (Bool) -> Void) {
         guard isNetworkPathSatisfied else {
             completion(false)
             return
         }
         
-        // Light-weight ping to verify real internet access
-        guard let url = URL(string: "https://www.apple.com/library/test/success.html") else {
-            completion(false)
-            return
-        }
+        // ping to verify real internet access
+        // Step 1: Try Apple URL
+        let appleURL = URL(string: "https://www.apple.com/library/test/success.html")!
+        let customURL = URL(string: "\(yourcustomurlhere)/v1/health")!
         
+        checkURL(appleURL) { success in
+            if success {
+                completion(true)
+            } else {
+                // Step 2: Fallback to custom health URL
+                self.checkURL(customURL) { fallbackSuccess in
+                    completion(fallbackSuccess)
+                }
+            }
+        }
+    }
+    
+    /// check a given URL
+    private func checkURL(_ url: URL, completion: @escaping (Bool) -> Void) {
         var request = URLRequest(url: url)
         request.timeoutInterval = 5
         
         URLSession.shared.dataTask(with: request) { _, response, error in
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
                 completion(true)
             } else {
                 completion(false)
             }
         }.resume()
     }
+    
+    /// Stop monitoring if needed (e.g., on app shutdown or testing)
+    func stopMonitoring() {
+        monitor.cancel()
+        isMonitoring = false
+    }
+    
 }
 
+
 /*
-// Use case -
-
-
- DataCheck.shared.hasRealInternet { isConnected in
+ 
+ // Use case
+ DataCheck.shared.internetDataCheck { isConnected in
      if isConnected {
-         // ✅ Proceed with API call
+         debugPrint("Getting Internet")
      } else {
-         // ❌ Show offline message or handle fallback
+         debugPrint("Not Getting Internet")
      }
  }
-
+ 
+ // To stop monitoring
+ DataCheck.shared.stopMonitoring()
  
  */
